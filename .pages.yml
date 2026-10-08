@@ -1,0 +1,132 @@
+# ==========================================================
+# تنظیمات پنل Pages CMS برای ریپوی مدیا
+# این محتوا باید توی فایلی به اسم  .pages.yml  (با نقطه اول) ذخیره بشه
+# ==========================================================
+
+media:
+  - name: covers
+    label: Covers (جلد مانگاها)
+    input: media/covers
+    output: /media/covers
+    rename: safe
+    extensions: [jpg, jpeg, png, webp, gif, avif]
+  - name: files
+    label: Manga files (فایل PDF / ZIP)
+    input: media/files
+    output: /media/files
+    rename: safe
+    extensions: [pdf, zip, cbz, cbr, rar, epub]
+
+content:
+  # ---------------- مانگاها ----------------
+  - name: manga
+    label: Manga (مانگاها)
+    type: collection
+    path: _data/manga
+    format: json
+    filename:
+      template: "{primary}.json"
+      field: create
+    view:
+      fields: [title, title_fa, volumes_count, draft]
+      primary: title
+      sort: [title]
+      default:
+        sort: title
+        order: asc
+    fields:
+      - name: cover
+        label: Cover Image (تصویر جلد)
+        type: image
+        required: true
+        options:
+          media: covers
+      - name: title
+        label: English Title (نام انگلیسی)
+        type: string
+        required: true
+      - name: title_fa
+        label: Persian Title (نام فارسی)
+        type: string
+        required: true
+      - name: volumes_count
+        label: Number of Volumes (تعداد جلدها)
+        type: number
+      - name: genres
+        label: Genre (ژانر)
+        type: select
+        options:
+          multiple: true
+          values:
+            - اکشن
+            - ماجراجویی
+            - کمدی
+            - درام
+            - فانتزی
+            - ترسناک
+            - عاشقانه
+            - علمی‌تخیلی
+            - ورزشی
+            - رازآلود
+            - روانشناختی
+            - ماورایی
+            - تاریخی
+            - مدرسه‌ای
+            - شونن
+            - سینن
+            - شوجو
+            - جوسی
+      - name: author
+        label: Author (نویسنده / مانگاکا)
+        type: string
+      - name: status
+        label: Status (وضعیت انتشار)
+        type: select
+        options:
+          values:
+            - در حال انتشار
+            - تکمیل‌شده
+            - متوقف‌شده
+      - name: description
+        label: Description (خلاصه داستان)
+        type: text
+      - name: draft
+        label: Hide from site (پیش‌نویس - روی سایت نمایش داده نشه)
+        type: boolean
+
+  # ---------------- جلدها ----------------
+  - name: volumes
+    label: Volumes (جلدها)
+    type: collection
+    path: _data/volumes
+    format: json
+    filename: "{year}{month}{day}-{hour}{minute}{second}.json"
+    view:
+      fields: [manga, number]
+      primary: manga
+    fields:
+      - name: manga
+        label: Select Manga (انتخاب مانگا)
+        type: reference
+        required: true
+        options:
+          collection: manga
+          search: "fields.title,fields.title_fa"
+          value: "{path}"
+          label: "{title} — {title_fa}"
+      - name: number
+        label: Volume Number (شماره جلد)
+        type: number
+        required: true
+      - name: download_file
+        label: Download File — upload PDF/ZIP (فایل دانلود)
+        type: file
+        options:
+          media: files
+      - name: download_link
+        label: Download Link — or paste external link (لینک دانلود)
+        description: اگه فایل رو بالا آپلود کردی، این رو خالی بذار. اگه هر دو پر باشن، لینک اولویت داره.
+        type: string
+      - name: read_link
+        label: Read Online (Link) (لینک مطالعه آنلاین)
+        type: string
