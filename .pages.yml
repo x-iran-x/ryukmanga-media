@@ -10,6 +10,12 @@ media:
     output: /media/covers
     rename: safe
     extensions: [jpg, jpeg, png, webp, gif, avif]
+  - name: posters
+    label: Anime posters (پوستر انیمه‌ها)
+    input: media/posters
+    output: /media/posters
+    rename: safe
+    extensions: [jpg, jpeg, png, webp, gif, avif]
   - name: files
     label: Manga files (فایل PDF / ZIP)
     input: media/files
@@ -129,4 +135,130 @@ content:
         type: string
       - name: read_link
         label: Read Online (Link) (لینک مطالعه آنلاین)
+        type: string
+
+  # ---------------- انیمه‌ها ----------------
+  - name: anime
+    label: Anime (انیمه‌ها)
+    type: collection
+    path: _data/anime
+    format: json
+    filename:
+      template: "{primary}.json"
+      field: create
+    view:
+      fields: [title, title_fa, episodes_count, draft]
+      primary: title
+      sort: [title]
+      default:
+        sort: title
+        order: asc
+    fields:
+      - name: poster
+        label: Poster Image (پوستر)
+        type: image
+        required: true
+        options:
+          media: posters
+      - name: title
+        label: English Title (نام انگلیسی)
+        type: string
+        required: true
+      - name: title_fa
+        label: Persian Title (نام فارسی)
+        type: string
+        required: true
+      - name: episodes_count
+        label: Number of Episodes (تعداد قسمت‌ها)
+        type: number
+      - name: genres
+        label: Genre (ژانر)
+        type: select
+        options:
+          multiple: true
+          values:
+            - اکشن
+            - ماجراجویی
+            - کمدی
+            - درام
+            - فانتزی
+            - ترسناک
+            - عاشقانه
+            - علمی‌تخیلی
+            - ورزشی
+            - رازآلود
+            - روانشناختی
+            - ماورایی
+            - تاریخی
+            - مدرسه‌ای
+            - شونن
+            - سینن
+            - شوجو
+            - جوسی
+      - name: studio
+        label: Studio (استودیو)
+        type: string
+      - name: year
+        label: Release Year (سال انتشار)
+        type: number
+      - name: status
+        label: Status (وضعیت پخش)
+        type: select
+        options:
+          values:
+            - در حال پخش
+            - تکمیل‌شده
+            - متوقف‌شده
+      - name: description
+        label: Description (خلاصه داستان)
+        type: text
+      - name: draft
+        label: Hide from site (پیش‌نویس - روی سایت نمایش داده نشه)
+        type: boolean
+
+  # ---------------- قسمت‌ها ----------------
+  - name: episodes
+    label: Episodes (قسمت‌ها)
+    type: collection
+    path: _data/episodes
+    format: json
+    filename: "{year}{month}{day}-{hour}{minute}{second}.json"
+    view:
+      fields: [anime, number, quality]
+      primary: anime
+    fields:
+      - name: anime
+        label: Select Anime (انتخاب انیمه)
+        type: reference
+        required: true
+        options:
+          collection: anime
+          search: "fields.title,fields.title_fa"
+          value: "{path}"
+          label: "{title} — {title_fa}"
+      - name: number
+        label: Episode Number (شماره قسمت)
+        type: number
+        required: true
+      - name: quality
+        label: Quality (کیفیت)
+        type: select
+        options:
+          values:
+            - 480p
+            - 720p
+            - 1080p
+      - name: audio
+        label: Subtitle / Dub (زیرنویس یا دوبله)
+        type: select
+        options:
+          values:
+            - زیرنویس فارسی
+            - دوبله فارسی
+            - زیرنویس انگلیسی
+      - name: download_link
+        label: Download Link (لینک دانلود)
+        type: string
+      - name: watch_link
+        label: Watch Online (Link) (لینک تماشای آنلاین)
         type: string
