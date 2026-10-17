@@ -16,6 +16,24 @@ media:
     output: /media/posters
     rename: safe
     extensions: [jpg, jpeg, png, webp, gif, avif]
+  - name: artwork
+    label: Music artwork (کاور موزیک و ویدیو)
+    input: media/artwork
+    output: /media/artwork
+    rename: safe
+    extensions: [jpg, jpeg, png, webp, gif, avif]
+  - name: audio
+    label: Music files (فایل‌های صوتی)
+    input: media/audio
+    output: /media/audio
+    rename: safe
+    extensions: [mp3, m4a, ogg, wav]
+  - name: videos
+    label: Music videos (فایل‌های ویدیو)
+    input: media/videos
+    output: /media/videos
+    rename: safe
+    extensions: [mp4, webm]
   - name: files
     label: Manga files (فایل PDF / ZIP)
     input: media/files
@@ -262,3 +280,109 @@ content:
       - name: watch_link
         label: Watch Online (Link) (لینک تماشای آنلاین)
         type: string
+
+  # ---------------- موسیقی ----------------
+  - name: music
+    label: Music (موسیقی‌ها)
+    type: collection
+    path: _data/music
+    format: json
+    filename: "{year}{month}{day}-{hour}{minute}{second}.json"
+    view:
+      fields: [title, source, type, draft]
+      primary: title
+    fields:
+      - name: title
+        label: Track Title (نام موزیک)
+        type: string
+        required: true
+      - name: source
+        label: Source (منبع - مثلاً Death Note OST)
+        type: string
+        required: true
+      - name: artist
+        label: Artist (خواننده / آهنگساز)
+        type: string
+      - name: type
+        label: Type (نوع)
+        type: select
+        required: true
+        options:
+          values:
+            - OST
+            - اوپنینگ
+            - اندینگ
+            - اینسرت سانگ
+      - name: artwork
+        label: Artwork (تصویر کاور - اختیاری)
+        type: image
+        options:
+          media: artwork
+      - name: icon
+        label: Icon (ایموجی - وقتی کاور نداری نمایش داده می‌شه)
+        type: string
+      - name: audio_file
+        label: Audio File — upload MP3 (فایل صوتی)
+        type: file
+        options:
+          media: audio
+      - name: audio_link
+        label: Audio Link — or paste direct link (لینک مستقیم صوت)
+        description: اگه فایل رو بالا آپلود کردی، این رو خالی بذار. اگه هر دو پر باشن، لینک اولویت داره.
+        type: string
+      - name: draft
+        label: Hide from site (پیش‌نویس - روی سایت نمایش داده نشه)
+        type: boolean
+
+  # ---------------- موزیک ویدیو ----------------
+  - name: mv
+    label: Music Videos (موزیک ویدیوها)
+    type: collection
+    path: _data/mv
+    format: json
+    filename: "{year}{month}{day}-{hour}{minute}{second}.json"
+    view:
+      fields: [title, source, type, draft]
+      primary: title
+    fields:
+      - name: title
+        label: Video Title (نام موزیک ویدیو)
+        type: string
+        required: true
+      - name: source
+        label: Source (منبع - مثلاً Chainsaw Man)
+        type: string
+        required: true
+      - name: artist
+        label: Artist (خواننده)
+        type: string
+      - name: type
+        label: Type (نوع)
+        type: select
+        required: true
+        options:
+          values:
+            - اوپنینگ
+            - اندینگ
+            - موزیک ویدیو
+      - name: thumbnail
+        label: Thumbnail (تصویر پیش‌نمایش - اختیاری)
+        type: image
+        options:
+          media: artwork
+      - name: icon
+        label: Icon (ایموجی - وقتی تصویر نداری نمایش داده می‌شه)
+        type: string
+      - name: video_link
+        label: Video Link — YouTube / Aparat / direct .mp4 (لینک ویدیو)
+        description: لینک یوتیوب یا آپارات (صفحه ویدیو) یا لینک مستقیم فایل mp4 رو بذار.
+        type: string
+      - name: video_file
+        label: Video File — upload MP4, max 100 MB (فایل ویدیو)
+        description: فقط برای ویدیوهای کم‌حجم. اگه لینک بالا پر باشه، لینک اولویت داره.
+        type: file
+        options:
+          media: videos
+      - name: draft
+        label: Hide from site (پیش‌نویس - روی سایت نمایش داده نشه)
+        type: boolean
