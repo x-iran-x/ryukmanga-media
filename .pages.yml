@@ -280,6 +280,22 @@ content:
       - name: watch_link
         label: Watch Online (Link) (لینک تماشای آنلاین)
         type: string
+      - name: intro_start
+        label: Intro Start (seconds) (شروع اینترو به ثانیه)
+        description: زمان شروع نمایش دکمه رد کردن اینترو؛ برحسب ثانیه.
+        type: number
+      - name: intro_end
+        label: Intro End (seconds) (پایان اینترو به ثانیه)
+        description: زمان پایان اینترو و مقصد پرش؛ باید از شروع بیشتر باشد.
+        type: number
+      - name: outro_start
+        label: Outro Start (seconds) (شروع اوترو به ثانیه)
+        description: زمان شروع نمایش دکمه رد کردن اوترو؛ برحسب ثانیه.
+        type: number
+      - name: outro_end
+        label: Outro End (seconds) (پایان اوترو به ثانیه)
+        description: زمان پایان اوترو و مقصد پرش؛ باید از شروع بیشتر باشد.
+        type: number
 
   # ---------------- موسیقی ----------------
   - name: music
