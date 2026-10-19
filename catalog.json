@@ -26,5 +26,9 @@ permalink: /catalog.json
   "mv": [{% for entry in site.data.mv %}{
     "id": {{ entry[0] | jsonify }},
     "data": {{ entry[1] | jsonify }}
+  }{% unless forloop.last %},{% endunless %}{% endfor %}],
+  "articles": [{% for entry in site.data.articles %}{
+    "slug": {{ entry[0] | jsonify }},
+    "data": {{ entry[1] | jsonify }}
   }{% unless forloop.last %},{% endunless %}{% endfor %}]
 }
