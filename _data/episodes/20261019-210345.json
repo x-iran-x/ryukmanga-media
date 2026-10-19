@@ -4,5 +4,9 @@
   "quality": "480p",
   "audio": "دوبله فارسی",
   "download_link": "https://www.namasha.com/videos/dl/7600335913-480p/%D8%A7%D9%86%D8%AF%DB%8C%D9%86%DA%AF-%D9%81%D8%B5%D9%84%DB%B1-480p.mp4",
-  "watch_link": "https://s50.namasha.com/dash/7600335913/480p_dashinit"
+  "watch_link": "https://s50.namasha.com/dash/7600335913/480p_dashinit",
+  "intro_start": 26,
+  "intro_end": 46,
+  "outro_start": 90,
+  "outro_end": 100
 }
