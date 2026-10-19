@@ -402,3 +402,65 @@ content:
       - name: draft
         label: Hide from site (پیش‌نویس - روی سایت نمایش داده نشه)
         type: boolean
+
+  # ---------------- مقاله‌ها ----------------
+  - name: articles
+    label: Articles (مقاله‌ها و اخبار)
+    type: collection
+    path: _data/articles
+    format: json
+    filename:
+      template: "{slug}.json"
+      field: slug
+    view:
+      fields: [title, category, published_at, draft]
+      primary: title
+      sort: [published_at]
+      default:
+        sort: published_at
+        order: desc
+    fields:
+      - name: title
+        label: Title (عنوان مقاله)
+        type: string
+        required: true
+      - name: slug
+        label: URL Slug (شناسه آدرس انگلیسی)
+        description: بدون فاصله؛ مثلاً berserk-review
+        type: string
+        required: true
+      - name: summary
+        label: Summary (خلاصه مقاله)
+        type: text
+        required: true
+      - name: cover
+        label: Cover Image (تصویر کاور)
+        type: image
+        options:
+          media: artwork
+      - name: category
+        label: Category (دسته‌بندی)
+        type: select
+        options:
+          values:
+            - اخبار
+            - نقد و بررسی
+            - معرفی
+            - راهنما
+            - تحلیل
+      - name: tags
+        label: Tags (برچسب‌ها)
+        type: string
+      - name: author
+        label: Author (نویسنده)
+        type: string
+      - name: published_at
+        label: Publish Date (تاریخ انتشار)
+        type: date
+      - name: body
+        label: Article Body (متن کامل مقاله)
+        type: rich-text
+        required: true
+      - name: draft
+        label: Draft (پیش‌نویس؛ در سایت نمایش داده نشود)
+        type: boolean
