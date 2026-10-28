@@ -300,6 +300,10 @@ content:
         label: Outro End (seconds) (پایان اوترو به ثانیه)
         description: زمان پایان اوترو و مقصد پرش؛ باید از شروع بیشتر باشد.
         type: number
+      - name: draft
+        label: Hide episode from site (پیش‌نویس قسمت)
+        description: اگر فعال باشد، این قسمت در فهرست قسمت‌های سایت نمایش داده نمی‌شود.
+        type: boolean
 
   # ---------------- موسیقی ----------------
   - name: music
