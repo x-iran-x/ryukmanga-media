@@ -435,7 +435,6 @@ content:
         description: فقط حروف انگلیسی کوچک، عدد و خط تیره؛ مثلاً berserk-review
         type: string
         required: true
-        pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
       - name: summary
         label: Summary (خلاصه مقاله)
         type: text
