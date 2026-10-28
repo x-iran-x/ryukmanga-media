@@ -275,7 +275,12 @@ content:
         type: string
       - name: watch_link
         label: Watch Online (Link) (لینک تماشای آنلاین)
+        description: لینک مستقیم فایل یا صفحهٔ میزبان مثل نماشا؛ برای پلیر یوتیوب از فیلد جداگانهٔ پایین استفاده کن.
         type: string
+      - name: youtube_embed
+        label: YouTube Embed Code (کد امبد یوتیوب)
+        description: برای پخش با پلیر رسمی یوتیوب، کد iframe بخش Share > Embed را کامل اینجا بچسبان؛ یا لینک https://www.youtube.com/embed/VIDEO_ID را وارد کن. اگر پر باشد، بر watch_link اولویت دارد.
+        type: text
       - name: subtitle_link
         label: Subtitle File Link (لینک زیرنویس)
         description: لینک فایل زیرنویس مثل SRT یا VTT؛ می‌تواند لینک مستقیم خارجی باشد.
