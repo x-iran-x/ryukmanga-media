@@ -48,7 +48,9 @@ content:
     type: collection
     path: _data/manga
     format: json
-    filename: "{fields.slug}.json"
+    filename:
+      template: "{primary}.json"
+      field: create
     view:
       fields: [title, title_fa, volumes_count, draft]
       primary: title
@@ -57,12 +59,6 @@ content:
         sort: title
         order: asc
     fields:
-      - name: slug
-        label: URL Slug (شناسه آدرس انگلیسی)
-        description: فقط حروف انگلیسی کوچک، عدد و خط تیره؛ مثلاً berserk
-        type: string
-        required: true
-        pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
       - name: cover
         label: Cover Image (تصویر جلد)
         type: image
@@ -165,7 +161,9 @@ content:
     type: collection
     path: _data/anime
     format: json
-    filename: "{fields.slug}.json"
+    filename:
+      template: "{primary}.json"
+      field: create
     view:
       fields: [title, title_fa, episodes_count, draft]
       primary: title
@@ -174,12 +172,6 @@ content:
         sort: title
         order: asc
     fields:
-      - name: slug
-        label: URL Slug (شناسه آدرس انگلیسی)
-        description: فقط حروف انگلیسی کوچک، عدد و خط تیره؛ مثلاً death-note
-        type: string
-        required: true
-        pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
       - name: poster
         label: Poster Image (پوستر)
         type: image
@@ -475,3 +467,7 @@ content:
       - name: draft
         label: Draft (پیش‌نویس؛ در سایت نمایش داده نشود)
         type: boolean
+
+settings:
+  content:
+    merge: true
