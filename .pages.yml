@@ -48,9 +48,7 @@ content:
     type: collection
     path: _data/manga
     format: json
-    filename:
-      template: "{primary}.json"
-      field: create
+    filename: "{fields.title}.json"
     view:
       fields: [title, title_fa, volumes_count, draft]
       primary: title
@@ -161,9 +159,7 @@ content:
     type: collection
     path: _data/anime
     format: json
-    filename:
-      template: "{primary}.json"
-      field: create
+    filename: "{fields.title}.json"
     view:
       fields: [title, title_fa, episodes_count, draft]
       primary: title
