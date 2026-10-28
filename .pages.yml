@@ -48,9 +48,7 @@ content:
     type: collection
     path: _data/manga
     format: json
-    filename:
-      template: "{primary}.json"
-      field: create
+    filename: "{fields.slug}.json"
     view:
       fields: [title, title_fa, volumes_count, draft]
       primary: title
@@ -59,6 +57,12 @@ content:
         sort: title
         order: asc
     fields:
+      - name: slug
+        label: URL Slug (شناسه آدرس انگلیسی)
+        description: فقط حروف انگلیسی کوچک، عدد و خط تیره؛ مثلاً berserk
+        type: string
+        required: true
+        pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
       - name: cover
         label: Cover Image (تصویر جلد)
         type: image
@@ -161,9 +165,7 @@ content:
     type: collection
     path: _data/anime
     format: json
-    filename:
-      template: "{primary}.json"
-      field: create
+    filename: "{fields.slug}.json"
     view:
       fields: [title, title_fa, episodes_count, draft]
       primary: title
@@ -172,6 +174,12 @@ content:
         sort: title
         order: asc
     fields:
+      - name: slug
+        label: URL Slug (شناسه آدرس انگلیسی)
+        description: فقط حروف انگلیسی کوچک، عدد و خط تیره؛ مثلاً death-note
+        type: string
+        required: true
+        pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
       - name: poster
         label: Poster Image (پوستر)
         type: image
@@ -279,6 +287,10 @@ content:
         type: string
       - name: watch_link
         label: Watch Online (Link) (لینک تماشای آنلاین)
+        type: string
+      - name: subtitle_link
+        label: Subtitle File Link (لینک زیرنویس)
+        description: لینک فایل زیرنویس مثل SRT یا VTT؛ می‌تواند لینک مستقیم خارجی باشد.
         type: string
       - name: intro_start
         label: Intro Start (seconds) (شروع اینترو به ثانیه)
@@ -409,9 +421,7 @@ content:
     type: collection
     path: _data/articles
     format: json
-    filename:
-      template: "{slug}.json"
-      field: slug
+    filename: "{fields.slug}.json"
     view:
       fields: [title, category, published_at, draft]
       primary: title
@@ -426,9 +436,10 @@ content:
         required: true
       - name: slug
         label: URL Slug (شناسه آدرس انگلیسی)
-        description: بدون فاصله؛ مثلاً berserk-review
+        description: فقط حروف انگلیسی کوچک، عدد و خط تیره؛ مثلاً berserk-review
         type: string
         required: true
+        pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
       - name: summary
         label: Summary (خلاصه مقاله)
         type: text
