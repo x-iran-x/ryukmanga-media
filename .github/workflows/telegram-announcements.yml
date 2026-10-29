@@ -96,18 +96,18 @@ jobs:
               poster="https://raw.githubusercontent.com/x-iran-x/ryukmanga-media/main/${poster}"
             fi
 
-            # Bash ANSI-C quotes convert these into real newlines, not literal backslash-n text.
-            message="${kind}"$'\n\n'"${fa}"
+            # Build the message with printf so every separator is an actual newline.
+            printf -v message '%s\n\n%s' "${kind}" "${fa}"
             if [[ -n "${en}" ]]; then
-              message+=$'\n\n🇬🇧 '"${en}"
+              printf -v message '%s\n\n🇬🇧 %s' "${message}" "${en}"
             fi
             if [[ -n "${genres}" ]]; then
-              message+=$'\n\n🏷️ ژانرها: '"${genres}"
+              printf -v message '%s\n\n🏷️ ژانرها: %s' "${message}" "${genres}"
             fi
             if [[ -n "${synopsis}" ]]; then
-              message+=$'\n\n📝 خلاصه:\n'"${synopsis}"
+              printf -v message '%s\n\n📝 خلاصه:\n%s' "${message}" "${synopsis}"
             fi
-            message+=$'\n\n'"${tags}"
+            printf -v message '%s\n\n%s' "${message}" "${tags}"
 
             # Keep the full text under Telegram's message limit.
             message="$(jq -Rn --arg s "${message}" '$s | if length > 3900 then .[0:3897] + "…" else . end')"
