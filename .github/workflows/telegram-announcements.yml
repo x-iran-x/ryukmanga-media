@@ -110,7 +110,9 @@ jobs:
             printf -v message '%s\n\n%s' "${message}" "${tags}"
 
             # Keep the full text under Telegram's message limit.
-            message="$(jq -Rn --arg s "${message}" '$s | if length > 3900 then .[0:3897] + "…" else . end')"
+            if (( ${#message} > 3900 )); then
+              message="${message:0:3897}…" 
+            fi
             button="$(jq -cn --arg url "${url}" '{inline_keyboard:[[{text:"مشاهده در RyukManga",url:$url}]]}')"
 
             sent_photo="false"
