@@ -109,8 +109,7 @@ ${tags}"
             response="$(curl --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" -H 'Content-Type: application/json' --data "${payload}")"
 
             if [[ "$(jq -r '.ok // false' <<< "${response}")" != "true" ]]; then
-                echo "sendPhoto failed for ${file}; falling back to text: ${response}"
-                payload="$(jq -n --arg chat_id "${TELEGRAM_CHANNEL_ID}" --arg text "${caption}" --argjson reply_markup "${button}" '{chat_id:$chat_id,text:$text,parse_mode:"HTML",reply_markup:$reply_markup,disable_web_page_preview:true}')"
+                  payload="$(jq -n --arg chat_id "${TELEGRAM_CHANNEL_ID}" --arg text "${caption}" --argjson reply_markup "${button}" '{chat_id:$chat_id,text:$text,parse_mode:"HTML",reply_markup:$reply_markup,disable_web_page_preview:true}')"
                 response="$(curl --fail-with-body --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" -H 'Content-Type: application/json' --data "${payload}")"
               fi
             else
