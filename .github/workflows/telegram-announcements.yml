@@ -62,7 +62,7 @@ jobs:
 
             fa="$(jq -r '.title_fa // .name_fa // .persian_title // .title // "عنوان نامشخص" | tostring' "${file}")"
             en="$(jq -r '.title_en // .english_title // .original_title // (if (.title_fa // .name_fa // .persian_title) then .title else "" end) // "" | tostring' "${file}")"
-            [[ "${en}" == "${fa}" ]] && en=""
+            if [[ "${en}" == "${fa}" ]]; then en=""; fi
             genres="$(jq -r '(.genres // .genre // .tags // []) | if type == "array" then map(tostring) | join("، ") elif type == "string" then . else "" end' "${file}")"
             synopsis="$(jq -r '.synopsis_fa // .synopsis // .summary // .description // .plot // "" | tostring' "${file}")"
             poster="$(jq -r '.poster_url // .poster // .cover_image // .cover // .image_url // .image // .thumbnail // "" | if type == "string" then . else "" end' "${file}")"
