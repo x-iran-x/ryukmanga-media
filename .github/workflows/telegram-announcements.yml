@@ -29,38 +29,104 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "${TELEGRAM_BOT_TOKEN}" || -z "${TELEGRAM_CHANNEL_ID}" ]]; then
-            echo "Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHANNEL_ID repository secret."
+            echo "Missing Telegram repository secrets."
             exit 1
           fi
 
-          changed="$(git diff --name-only --diff-filter=AM "${BEFORE_SHA}" "${AFTER_SHA}" -- '_data/manga/*.json' '_data/anime/*.json' || true)"
+          # On a newly created branch GitHub may provide an all-zero BEFORE_SHA.
+          if [[ -z "${BEFORE_SHA}" || "${BEFORE_SHA}" =~ ^0+$ ]]; then
+            BEFORE_SHA="$(git rev-list --max-parents=0 "${AFTER_SHA}")"
+          fi
+
+          changed="$(git diff --name-only --diff-filter=A "${BEFORE_SHA}" "${AFTER_SHA}" -- '_data/manga/*.json' '_data/anime/*.json' || true)"
           if [[ -z "${changed}" ]]; then
-            echo "No new or updated manga/anime files."
+            echo "No newly added manga/anime files; edits do not trigger duplicate announcements."
             exit 0
           fi
+
+          html_escape() {
+            jq -Rn --arg value "$1" '$value | gsub("&"; "&amp;") | gsub("<"; "&lt;") | gsub(">"; "&gt;") | gsub("\\""; "&quot;") | gsub("\\u0027"; "&#39;")'
+          }
+
+          first_text() {
+            jq -r '[
+              .title_fa, .name_fa, .persian_title, .title,
+              .title_en, .original_title, .english_title
+            ] | map(select(type == "string" and length > 0)) | .[0] // ""' "$1"
+          }
 
           while IFS= read -r file; do
             [[ -f "${file}" ]] || continue
             draft="$(jq -r '(.draft // false) | tostring' "${file}")"
-            if [[ "${draft}" == "true" ]]; then
-              echo "Skipping draft: ${file}"
-              continue
-            fi
+            [[ "${draft}" == "true" ]] && { echo "Skipping draft: ${file}"; continue; }
 
-            title="$(jq -r '(.title_fa // .title // "عنوان نامشخص") | tostring' "${file}")"
-            original="$(jq -r '(.title // "") | tostring' "${file}")"
+            fa="$(jq -r '.title_fa // .name_fa // .persian_title // .title // "عنوان نامشخص" | tostring' "${file}")"
+            en="$(jq -r '.title_en // .english_title // .original_title // (if (.title_fa // .name_fa // .persian_title) then .title else "" end) // "" | tostring' "${file}")"
+            [[ "${en}" == "${fa}" ]] && en=""
+            genres="$(jq -r '(.genres // .genre // .tags // []) | if type == "array" then map(tostring) | join("، ") elif type == "string" then . else "" end' "${file}")"
+            synopsis="$(jq -r '.synopsis_fa // .synopsis // .summary // .description // .plot // "" | tostring' "${file}")"
+            poster="$(jq -r '.poster_url // .poster // .cover_image // .cover // .image_url // .image // .thumbnail // "" | if type == "string" then . else "" end' "${file}")"
+            slug="$(jq -r '.slug // .id // .url_slug // "" | tostring' "${file}")"
+
             if [[ "${file}" == _data/manga/* ]]; then
               kind="📚 مانگای جدید"
               url="https://ryukmanga.vercel.app/manga/"
+              tags="#مانگا #RyukManga"
             else
               kind="🎬 انیمهٔ جدید"
               url="https://ryukmanga.vercel.app/anime/"
+              tags="#انیمه #RyukManga"
             fi
 
-            message="$(printf '%s\n\n<b>%s</b>\n%s\n\n<a href="%s">مشاهده در RyukManga</a>' "$kind" "$title" "$original" "$url")"
-            payload="$(jq -n --arg chat_id "$TELEGRAM_CHANNEL_ID" --arg text "$message" '{chat_id:$chat_id,text:$text,parse_mode:"HTML",disable_web_page_preview:true}')"
-            response="$(curl --fail-with-body --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" -H 'Content-Type: application/json' --data "$payload")"
-            if [[ "$(jq -r '.ok' <<< "$response")" != "true" ]]; then
+            if [[ -n "${slug}" ]]; then
+              safe_slug="$(jq -rn --arg s "${slug}" '$s|@uri')"
+              # Keep the section link stable unless the site has a known detail route.
+              url="${url}"
+            fi
+
+            # Resolve relative poster paths against the published media repository.
+            if [[ -n "${poster}" && "${poster}" != http://* && "${poster}" != https://* ]]; then
+              poster="${poster#/}"
+              poster="https://ryukmanga.vercel.app/_media/${poster}"
+            fi
+
+            fa_h="$(html_escape "${fa}")"
+            en_h="$(html_escape "${en}")"
+            genres_h="$(html_escape "${genres}")"
+            synopsis_h="$(html_escape "${synopsis}")"
+
+            caption="${kind}"$'\n\n'"<b>${fa_h}</b>"
+            if [[ -n "${en_h}" ]]; then caption+="
+🇬🇧 ${en_h}"; fi
+            if [[ -n "${genres_h}" ]]; then caption+="
+
+🏷️ <b>ژانرها:</b> ${genres_h}"; fi
+            if [[ -n "${synopsis_h}" ]]; then caption+="
+
+📝 <b>خلاصه:</b>
+${synopsis_h}"; fi
+            caption+="
+
+${tags}"
+
+            # Telegram photo captions are limited to 1024 characters.
+            caption="$(jq -Rn --arg s "${caption}" '$s | if length > 980 then .[0:977] + "…" else . end')"
+            button="$(jq -cn --arg url "${url}" '{inline_keyboard:[[{text:"مشاهده در RyukManga",url:$url}]]}')"
+
+            if [[ -n "${poster}" ]]; then
+              payload="$(jq -n --arg chat_id "${TELEGRAM_CHANNEL_ID}" --arg photo "${poster}" --arg caption "${caption}" --argjson reply_markup "${button}" '{chat_id:$chat_id,photo:$photo,caption:$caption,parse_mode:"HTML",reply_markup:$reply_markup}')"
+              response="$(curl --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto" -H 'Content-Type: application/json' --data "${payload}")"
+              if [[ "$(jq -r '.ok // false' <<< "${response}")" != "true" ]]; then
+                echo "sendPhoto failed for ${file}; falling back to text: ${response}"
+                payload="$(jq -n --arg chat_id "${TELEGRAM_CHANNEL_ID}" --arg text "${caption}" --argjson reply_markup "${button}" '{chat_id:$chat_id,text:$text,parse_mode:"HTML",reply_markup:$reply_markup,disable_web_page_preview:true}')"
+                response="$(curl --fail-with-body --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" -H 'Content-Type: application/json' --data "${payload}")"
+              fi
+            else
+              payload="$(jq -n --arg chat_id "${TELEGRAM_CHANNEL_ID}" --arg text "${caption}" --argjson reply_markup "${button}" '{chat_id:$chat_id,text:$text,parse_mode:"HTML",reply_markup:$reply_markup,disable_web_page_preview:true}')"
+              response="$(curl --fail-with-body --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" -H 'Content-Type: application/json' --data "${payload}")"
+            fi
+
+            if [[ "$(jq -r '.ok // false' <<< "${response}")" != "true" ]]; then
               echo "Telegram rejected announcement for ${file}: ${response}"
               exit 1
             fi
