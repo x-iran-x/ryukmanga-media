@@ -76,28 +76,17 @@ jobs:
               tags="#انیمه #RyukManga"
             fi
 
-            message="${kind}
-
-${fa}"
+            message="${kind}"$'\n\n'"${fa}"
             if [[ -n "${en}" ]]; then
-              message+="
-
-🇬🇧 ${en}"
+              message+="\n\n🇬🇧 ${en}"
             fi
             if [[ -n "${genres}" ]]; then
-              message+="
-
-🏷️ ژانرها: ${genres}"
+              message+="\n\n🏷️ ژانرها: ${genres}"
             fi
             if [[ -n "${synopsis}" ]]; then
-              message+="
-
-📝 خلاصه:
-${synopsis}"
+              message+="\n\n📝 خلاصه:\n${synopsis}"
             fi
-            message+="
-
-${tags}"
+            message+="\n\n${tags}"
 
             # Telegram text messages allow up to 4096 characters. Trim safely without HTML parsing.
             message="$(jq -Rn --arg s "${message}" '$s | if length > 3900 then .[0:3897] + "…" else . end')"
