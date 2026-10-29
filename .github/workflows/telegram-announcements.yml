@@ -6,6 +6,7 @@ on:
     paths:
       - "_data/manga/**.json"
       - "_data/anime/**.json"
+      - ".github/workflows/telegram-announcements.yml"
 
 permissions:
   contents: read
@@ -20,52 +21,50 @@ jobs:
           fetch-depth: 0
 
       - name: Announce newly published manga and anime
+        shell: bash
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
           BEFORE_SHA: ${{ github.event.before }}
           AFTER_SHA: ${{ github.sha }}
-        shell: bash
         run: |
           set -euo pipefail
+
           if [[ -z "${TELEGRAM_BOT_TOKEN}" || -z "${TELEGRAM_CHANNEL_ID}" ]]; then
-            echo "Missing Telegram repository secrets."
+            echo "::error::Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHANNEL_ID repository secret."
             exit 1
           fi
 
-          # On a newly created branch GitHub may provide an all-zero BEFORE_SHA.
-          if [[ -z "${BEFORE_SHA}" || "${BEFORE_SHA}" =~ ^0+$ ]]; then
-            BEFORE_SHA="$(git rev-list --max-parents=0 "${AFTER_SHA}")"
+          if [[ -z "${AFTER_SHA}" ]]; then
+            echo "::error::Missing commit SHA."
+            exit 1
           fi
 
-          changed="$(git diff --name-only --diff-filter=A "${BEFORE_SHA}" "${AFTER_SHA}" -- '_data/manga/*.json' '_data/anime/*.json' || true)"
+          # A push that only changes this workflow should validate the job but never send an announcement.
+          if [[ -z "${BEFORE_SHA}" || "${BEFORE_SHA}" =~ ^0+$ ]]; then
+            BEFORE_SHA="$(git rev-list --max-parents=0 "${AFTER_SHA}" | tail -n 1)"
+          fi
+
+          changed="$(git diff --name-only --diff-filter=A "${BEFORE_SHA}" "${AFTER_SHA}" -- '_data/manga/**.json' '_data/anime/**.json')"
           if [[ -z "${changed}" ]]; then
-            echo "No newly added manga/anime files; edits do not trigger duplicate announcements."
+            echo "No newly added manga/anime files; nothing to announce."
             exit 0
           fi
 
-          html_escape() {
-            jq -Rn --arg value "$1" '$value | gsub("&"; "&amp;") | gsub("<"; "&lt;") | gsub(">"; "&gt;") | gsub("\\""; "&quot;") | gsub("\\u0027"; "&#39;")'
-          }
-
-          first_text() {
-            jq -r '[
-              .title_fa, .name_fa, .persian_title, .title,
-              .title_en, .original_title, .english_title
-            ] | map(select(type == "string" and length > 0)) | .[0] // ""' "$1"
-          }
-
           while IFS= read -r file; do
-            [[ -f "${file}" ]] || continue
+            [[ -n "${file}" && -f "${file}" ]] || continue
+
             draft="$(jq -r '(.draft // false) | tostring' "${file}")"
-            [[ "${draft}" == "true" ]] && { echo "Skipping draft: ${file}"; continue; }
+            if [[ "${draft}" == "true" ]]; then
+              echo "Skipping draft: ${file}"
+              continue
+            fi
 
             fa="$(jq -r '.title_fa // .name_fa // .persian_title // .title // "عنوان نامشخص" | tostring' "${file}")"
             en="$(jq -r '.title_en // .english_title // .original_title // (if (.title_fa // .name_fa // .persian_title) then .title else "" end) // "" | tostring' "${file}")"
-            if [[ "${en}" == "${fa}" ]]; then en=""; fi
+            [[ "${en}" == "${fa}" ]] && en=""
             genres="$(jq -r '(.genres // .genre // .tags // []) | if type == "array" then map(tostring) | join("، ") elif type == "string" then . else "" end' "${file}")"
             synopsis="$(jq -r '.synopsis_fa // .synopsis // .summary // .description // .plot // "" | tostring' "${file}")"
-            slug="$(jq -r '.slug // .id // .url_slug // "" | tostring' "${file}")"
 
             if [[ "${file}" == _data/manga/* ]]; then
               kind="📚 مانگای جدید"
@@ -77,48 +76,37 @@ jobs:
               tags="#انیمه #RyukManga"
             fi
 
-            if [[ -n "${slug}" ]]; then
-              safe_slug="$(jq -rn --arg s "${slug}" '$s|@uri')"
-              # Keep the section link stable unless the site has a known detail route.
-              url="${url}"
+            message="${kind}
+
+${fa}"
+            if [[ -n "${en}" ]]; then
+              message+="
+
+🇬🇧 ${en}"
             fi
+            if [[ -n "${genres}" ]]; then
+              message+="
 
-            fa_h="$(html_escape "${fa}")"
-            en_h="$(html_escape "${en}")"
-            genres_h="$(html_escape "${genres}")"
-            synopsis_h="$(html_escape "${synopsis}")"
+🏷️ ژانرها: ${genres}"
+            fi
+            if [[ -n "${synopsis}" ]]; then
+              message+="
 
-            caption="${kind}"$'\n\n'"<b>${fa_h}</b>"
-            if [[ -n "${en_h}" ]]; then caption+="
-🇬🇧 ${en_h}"; fi
-            if [[ -n "${genres_h}" ]]; then caption+="
-
-🏷️ <b>ژانرها:</b> ${genres_h}"; fi
-            if [[ -n "${synopsis_h}" ]]; then caption+="
-
-📝 <b>خلاصه:</b>
-${synopsis_h}"; fi
-            caption+="
+📝 خلاصه:
+${synopsis}"
+            fi
+            message+="
 
 ${tags}"
 
-            # Text-only announcement: photo sending has been removed.
-            caption="$(jq -Rn --arg s "${caption}" '$s | if length > 4000 then .[0:3997] + "…" else . end')"
+            # Telegram text messages allow up to 4096 characters. Trim safely without HTML parsing.
+            message="$(jq -Rn --arg s "${message}" '$s | if length > 3900 then .[0:3897] + "…" else . end')"
             button="$(jq -cn --arg url "${url}" '{inline_keyboard:[[{text:"مشاهده در RyukManga",url:$url}]]}')"
-            payload="$(jq -n --arg chat_id "${TELEGRAM_CHANNEL_ID}" --arg text "${caption}" --argjson reply_markup "${button}" '{chat_id:$chat_id,text:$text,parse_mode:"HTML",reply_markup:$reply_markup,disable_web_page_preview:true}')"
+            payload="$(jq -n --arg chat_id "${TELEGRAM_CHANNEL_ID}" --arg text "${message}" --argjson reply_markup "${button}" '{chat_id:$chat_id,text:$text,reply_markup:$reply_markup,disable_web_page_preview:true}')"
+
             response="$(curl --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" -H 'Content-Type: application/json' --data "${payload}")"
-
             if [[ "$(jq -r '.ok // false' <<< "${response}")" != "true" ]]; then
-                  payload="$(jq -n --arg chat_id "${TELEGRAM_CHANNEL_ID}" --arg text "${caption}" --argjson reply_markup "${button}" '{chat_id:$chat_id,text:$text,parse_mode:"HTML",reply_markup:$reply_markup,disable_web_page_preview:true}')"
-                response="$(curl --fail-with-body --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" -H 'Content-Type: application/json' --data "${payload}")"
-              fi
-            else
-              payload="$(jq -n --arg chat_id "${TELEGRAM_CHANNEL_ID}" --arg text "${caption}" --argjson reply_markup "${button}" '{chat_id:$chat_id,text:$text,parse_mode:"HTML",reply_markup:$reply_markup,disable_web_page_preview:true}')"
-              response="$(curl --fail-with-body --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" -H 'Content-Type: application/json' --data "${payload}")"
-            fi
-
-            if [[ "$(jq -r '.ok // false' <<< "${response}")" != "true" ]]; then
-              echo "Telegram rejected announcement for ${file}: ${response}"
+              echo "::error::Telegram rejected announcement for ${file}: ${response}"
               exit 1
             fi
             echo "Announced ${file}"
