@@ -40,12 +40,12 @@ jobs:
             exit 1
           fi
 
-          # A push that only changes this workflow should validate the job but never send an announcement.
+          # Workflow-only commits validate this job but do not announce existing files again.
           if [[ -z "${BEFORE_SHA}" || "${BEFORE_SHA}" =~ ^0+$ ]]; then
             BEFORE_SHA="$(git rev-list --max-parents=0 "${AFTER_SHA}" | tail -n 1)"
           fi
 
-          changed="$(git diff --name-only --diff-filter=A "${BEFORE_SHA}" "${AFTER_SHA}" -- '_data/manga/**.json' '_data/anime/**.json')"
+          changed="$(git diff --name-only --diff-filter=A "${BEFORE_SHA}" "${AFTER_SHA}" -- '_data/manga/*.json' '_data/anime/*.json')"
           if [[ -z "${changed}" ]]; then
             echo "No newly added manga/anime files; nothing to announce."
             exit 0
@@ -62,9 +62,10 @@ jobs:
 
             fa="$(jq -r '.title_fa // .name_fa // .persian_title // .title // "عنوان نامشخص" | tostring' "${file}")"
             en="$(jq -r '.title_en // .english_title // .original_title // (if (.title_fa // .name_fa // .persian_title) then .title else "" end) // "" | tostring' "${file}")"
-            [[ "${en}" == "${fa}" ]] && en=""
+            if [[ "${en}" == "${fa}" ]]; then en=""; fi
             genres="$(jq -r '(.genres // .genre // .tags // []) | if type == "array" then map(tostring) | join("، ") elif type == "string" then . else "" end' "${file}")"
             synopsis="$(jq -r '.synopsis_fa // .synopsis // .summary // .description // .plot // "" | tostring' "${file}")"
+            poster="$(jq -r '.poster_url // .poster // .cover_image // .cover // .image_url // .image // .thumbnail // "" | if type == "string" then . else "" end' "${file}")"
 
             if [[ "${file}" == _data/manga/* ]]; then
               kind="📚 مانگای جدید"
@@ -76,27 +77,84 @@ jobs:
               tags="#انیمه #RyukManga"
             fi
 
+            # Resolve CMS image paths to public files in the separate media repository.
+            if [[ -n "${poster}" && "${poster}" != http://* && "${poster}" != https://* ]]; then
+              poster="${poster#/}"
+              poster="${poster#_media/}"
+              case "${poster}" in
+                media/*) ;;
+                posters/*) poster="media/posters/${poster#posters/}" ;;
+                covers/*) poster="media/covers/${poster#covers/}" ;;
+                *)
+                  if [[ "${file}" == _data/manga/* ]]; then
+                    poster="media/covers/${poster##*/}"
+                  else
+                    poster="media/posters/${poster##*/}"
+                  fi
+                  ;;
+              esac
+              poster="https://raw.githubusercontent.com/x-iran-x/ryukmanga-media/main/${poster}"
+            fi
+
+            # Bash ANSI-C quotes convert these into real newlines, not literal backslash-n text.
             message="${kind}"$'\n\n'"${fa}"
             if [[ -n "${en}" ]]; then
-              message+="\n\n🇬🇧 ${en}"
+              message+=$'\n\n🇬🇧 '"${en}"
             fi
             if [[ -n "${genres}" ]]; then
-              message+="\n\n🏷️ ژانرها: ${genres}"
+              message+=$'\n\n🏷️ ژانرها: '"${genres}"
             fi
             if [[ -n "${synopsis}" ]]; then
-              message+="\n\n📝 خلاصه:\n${synopsis}"
+              message+=$'\n\n📝 خلاصه:\n'"${synopsis}"
             fi
-            message+="\n\n${tags}"
+            message+=$'\n\n'"${tags}"
 
-            # Telegram text messages allow up to 4096 characters. Trim safely without HTML parsing.
+            # Keep the full text under Telegram's message limit.
             message="$(jq -Rn --arg s "${message}" '$s | if length > 3900 then .[0:3897] + "…" else . end')"
             button="$(jq -cn --arg url "${url}" '{inline_keyboard:[[{text:"مشاهده در RyukManga",url:$url}]]}')"
-            payload="$(jq -n --arg chat_id "${TELEGRAM_CHANNEL_ID}" --arg text "${message}" --argjson reply_markup "${button}" '{chat_id:$chat_id,text:$text,reply_markup:$reply_markup,disable_web_page_preview:true}')"
 
-            response="$(curl --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" -H 'Content-Type: application/json' --data "${payload}")"
-            if [[ "$(jq -r '.ok // false' <<< "${response}")" != "true" ]]; then
-              echo "::error::Telegram rejected announcement for ${file}: ${response}"
-              exit 1
+            sent_photo="false"
+            if [[ -n "${poster}" ]]; then
+              # Photo captions have a smaller limit; for long descriptions, put only titles on the image.
+              if [[ "${#message}" -le 950 ]]; then
+                photo_caption="${message}"
+              else
+                photo_caption="${kind}"$'\n\n'"${fa}"
+                if [[ -n "${en}" ]]; then
+                  photo_caption+=$'\n🇬🇧 '"${en}"
+                fi
+              fi
+
+              payload="$(jq -n --arg chat_id "${TELEGRAM_CHANNEL_ID}" --arg photo "${poster}" --arg caption "${photo_caption}" --argjson reply_markup "${button}" '{chat_id:$chat_id,photo:$photo,caption:$caption,reply_markup:$reply_markup}')"
+              photo_response="$(curl --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto" -H 'Content-Type: application/json' --data "${payload}" || true)"
+              photo_ok="$(jq -r '.ok // false' <<< "${photo_response}" 2>/dev/null || echo false)"
+              if [[ "${photo_ok}" == "true" ]]; then
+                sent_photo="true"
+                echo "Sent poster for ${file}."
+              else
+                echo "::warning::Telegram photo failed for ${file}; falling back to text. Response: ${photo_response}"
+              fi
             fi
-            echo "Announced ${file}"
+
+            # Fall back to full text if there is no working poster.
+            if [[ "${sent_photo}" != "true" ]]; then
+              payload="$(jq -n --arg chat_id "${TELEGRAM_CHANNEL_ID}" --arg text "${message}" --argjson reply_markup "${button}" '{chat_id:$chat_id,text:$text,reply_markup:$reply_markup,disable_web_page_preview:true}')"
+              response="$(curl --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" -H 'Content-Type: application/json' --data "${payload}" || true)"
+              text_ok="$(jq -r '.ok // false' <<< "${response}" 2>/dev/null || echo false)"
+              if [[ "${text_ok}" != "true" ]]; then
+                echo "::error::Telegram rejected announcement for ${file}: ${response}"
+                exit 1
+              fi
+              echo "Announced ${file} as text."
+            elif [[ "${#message}" -gt 950 ]]; then
+              # Keep the full genre list and synopsis intact when they exceed the photo-caption limit.
+              payload="$(jq -n --arg chat_id "${TELEGRAM_CHANNEL_ID}" --arg text "${message}" '{chat_id:$chat_id,text:$text,disable_web_page_preview:true}')"
+              response="$(curl --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" -H 'Content-Type: application/json' --data "${payload}" || true)"
+              text_ok="$(jq -r '.ok // false' <<< "${response}" 2>/dev/null || echo false)"
+              if [[ "${text_ok}" != "true" ]]; then
+                echo "::error::Telegram rejected the details message for ${file}: ${response}"
+                exit 1
+              fi
+              echo "Sent full details for ${file}."
+            fi
           done <<< "${changed}"
