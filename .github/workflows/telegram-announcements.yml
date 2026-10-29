@@ -1,0 +1,68 @@
+name: Telegram content announcements
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "_data/manga/**.json"
+      - "_data/anime/**.json"
+
+permissions:
+  contents: read
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out published content
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Announce newly published manga and anime
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${TELEGRAM_BOT_TOKEN}" || -z "${TELEGRAM_CHANNEL_ID}" ]]; then
+            echo "Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHANNEL_ID repository secret."
+            exit 1
+          fi
+
+          changed="$(git diff --name-only --diff-filter=AM "${BEFORE_SHA}" "${AFTER_SHA}" -- '_data/manga/*.json' '_data/anime/*.json' || true)"
+          if [[ -z "${changed}" ]]; then
+            echo "No new or updated manga/anime files."
+            exit 0
+          fi
+
+          while IFS= read -r file; do
+            [[ -f "${file}" ]] || continue
+            draft="$(jq -r '(.draft // false) | tostring' "${file}")"
+            if [[ "${draft}" == "true" ]]; then
+              echo "Skipping draft: ${file}"
+              continue
+            fi
+
+            title="$(jq -r '(.title_fa // .title // "عنوان نامشخص") | tostring' "${file}")"
+            original="$(jq -r '(.title // "") | tostring' "${file}")"
+            if [[ "${file}" == _data/manga/* ]]; then
+              kind="📚 مانگای جدید"
+              url="https://ryukmanga.vercel.app/manga/"
+            else
+              kind="🎬 انیمهٔ جدید"
+              url="https://ryukmanga.vercel.app/anime/"
+            fi
+
+            message="$(printf '%s\n\n<b>%s</b>\n%s\n\n<a href="%s">مشاهده در RyukManga</a>' "$kind" "$title" "$original" "$url")"
+            payload="$(jq -n --arg chat_id "$TELEGRAM_CHANNEL_ID" --arg text "$message" '{chat_id:$chat_id,text:$text,parse_mode:"HTML",disable_web_page_preview:true}')"
+            response="$(curl --fail-with-body --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" -H 'Content-Type: application/json' --data "$payload")"
+            if [[ "$(jq -r '.ok' <<< "$response")" != "true" ]]; then
+              echo "Telegram rejected announcement for ${file}: ${response}"
+              exit 1
+            fi
+            echo "Announced ${file}"
+          done <<< "${changed}"
