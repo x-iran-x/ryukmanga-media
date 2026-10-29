@@ -65,7 +65,6 @@ jobs:
             if [[ "${en}" == "${fa}" ]]; then en=""; fi
             genres="$(jq -r '(.genres // .genre // .tags // []) | if type == "array" then map(tostring) | join("، ") elif type == "string" then . else "" end' "${file}")"
             synopsis="$(jq -r '.synopsis_fa // .synopsis // .summary // .description // .plot // "" | tostring' "${file}")"
-            poster="$(jq -r '.poster_url // .poster // .cover_image // .cover // .image_url // .image // .thumbnail // "" | if type == "string" then . else "" end' "${file}")"
             slug="$(jq -r '.slug // .id // .url_slug // "" | tostring' "${file}")"
 
             if [[ "${file}" == _data/manga/* ]]; then
@@ -82,12 +81,6 @@ jobs:
               safe_slug="$(jq -rn --arg s "${slug}" '$s|@uri')"
               # Keep the section link stable unless the site has a known detail route.
               url="${url}"
-            fi
-
-            # Resolve relative poster paths against the published media repository.
-            if [[ -n "${poster}" && "${poster}" != http://* && "${poster}" != https://* ]]; then
-              poster="${poster#/}"
-              poster="https://ryukmanga.vercel.app/_media/${poster}"
             fi
 
             fa_h="$(html_escape "${fa}")"
@@ -109,14 +102,13 @@ ${synopsis_h}"; fi
 
 ${tags}"
 
-            # Telegram photo captions are limited to 1024 characters.
-            caption="$(jq -Rn --arg s "${caption}" '$s | if length > 980 then .[0:977] + "…" else . end')"
+            # Text-only announcement: photo sending has been removed.
+            caption="$(jq -Rn --arg s "${caption}" '$s | if length > 4000 then .[0:3997] + "…" else . end')"
             button="$(jq -cn --arg url "${url}" '{inline_keyboard:[[{text:"مشاهده در RyukManga",url:$url}]]}')"
+            payload="$(jq -n --arg chat_id "${TELEGRAM_CHANNEL_ID}" --arg text "${caption}" --argjson reply_markup "${button}" '{chat_id:$chat_id,text:$text,parse_mode:"HTML",reply_markup:$reply_markup,disable_web_page_preview:true}')"
+            response="$(curl --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" -H 'Content-Type: application/json' --data "${payload}")"
 
-            if [[ -n "${poster}" ]]; then
-              payload="$(jq -n --arg chat_id "${TELEGRAM_CHANNEL_ID}" --arg photo "${poster}" --arg caption "${caption}" --argjson reply_markup "${button}" '{chat_id:$chat_id,photo:$photo,caption:$caption,parse_mode:"HTML",reply_markup:$reply_markup}')"
-              response="$(curl --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto" -H 'Content-Type: application/json' --data "${payload}")"
-              if [[ "$(jq -r '.ok // false' <<< "${response}")" != "true" ]]; then
+            if [[ "$(jq -r '.ok // false' <<< "${response}")" != "true" ]]; then
                 echo "sendPhoto failed for ${file}; falling back to text: ${response}"
                 payload="$(jq -n --arg chat_id "${TELEGRAM_CHANNEL_ID}" --arg text "${caption}" --argjson reply_markup "${button}" '{chat_id:$chat_id,text:$text,parse_mode:"HTML",reply_markup:$reply_markup,disable_web_page_preview:true}')"
                 response="$(curl --fail-with-body --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" -H 'Content-Type: application/json' --data "${payload}")"
